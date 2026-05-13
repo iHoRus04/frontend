@@ -3,9 +3,6 @@ import axios from "axios";
 
 const API = ""; // Sử dụng proxy từ package.json
 
-const [userForm, setUserForm] = useState(initialUserForm);
-const [addrForm, setAddrForm] = useState(initialAddrForm);
-
 export default function App() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
