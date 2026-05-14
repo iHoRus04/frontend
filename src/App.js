@@ -16,11 +16,14 @@ export default function App() {
       setLoading(true);
       setError(null);
       const url = API ? `${API}/users` : "/users";
-      const { data } = await axios.get(url);
+      const res = await axios.get(url);
+      console.log("Response URL:", url, "status:", res.status, "headers:", res.headers);
+      const data = res.data;
       console.log("Dữ liệu từ API:", data);
 
       // Nếu server trả về HTML (ví dụ index.html) thì báo lỗi dễ hiểu
       if (typeof data === 'string' && data.trim().startsWith('<')) {
+        console.error('Received HTML from API; likely wrong API URL or proxy.');
         throw new Error('Unexpected HTML response from API (check REACT_APP_API or backend).');
       }
 
