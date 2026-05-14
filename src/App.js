@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = process.env.REACT_APP_API || ""; // Production: set REACT_APP_API on Vercel; Dev: empty uses CRA proxy
+const DEFAULT_API = "https://backend-sr4i.onrender.com";
+const API = process.env.REACT_APP_API || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '' : DEFAULT_API);
 
 export default function App() {
   const [users, setUsers] = useState([]);
