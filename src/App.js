@@ -16,7 +16,14 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const url = API ? `${API}/users` : "/users";
+      // Build request URL:
+      // - If REACT_APP_API is set, call that backend directly
+      // - If running on localhost (dev), call CRA proxy `/users`
+      // - Otherwise (production w/o REACT_APP_API) call our serverless proxy `/api/users`
+      let url;
+      if (API) url = `${API}/users`;
+      else if (typeof window !== 'undefined' && window.location.hostname === 'localhost') url = '/users';
+      else url = '/api/users';
       const res = await axios.get(url);
       console.log("Response URL:", url, "status:", res.status, "headers:", res.headers);
       const data = res.data;
