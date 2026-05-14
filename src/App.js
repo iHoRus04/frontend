@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const DEFAULT_API = "https://backend-sr4i.onrender.com";
-const API = process.env.REACT_APP_API || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '' : DEFAULT_API);
+const envApi = process.env.REACT_APP_API;
+const hasEnvApi = typeof envApi === 'string' && envApi.trim() !== '';
+const API = hasEnvApi ? envApi : (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '' : '');
 
 export default function App() {
   const [users, setUsers] = useState([]);
