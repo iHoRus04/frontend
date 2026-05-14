@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = ""; // Sử dụng proxy từ package.json
+const API = ""; // Sử dụng proxy từ package.json (requests use relative paths)
 
 export default function App() {
   const [users, setUsers] = useState([]);
