@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = ""; // Sử dụng proxy từ package.json (requests use relative paths)
+const API = process.env.REACT_APP_API || ""; // Production: set REACT_APP_API on Vercel; Dev: empty uses CRA proxy
 
 export default function App() {
   const [users, setUsers] = useState([]);
@@ -15,9 +15,15 @@ export default function App() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await axios.get(`${API}/users`);
+      const url = API ? `${API}/users` : "/users";
+      const { data } = await axios.get(url);
       console.log("Dữ liệu từ API:", data);
-      
+
+      // Nếu server trả về HTML (ví dụ index.html) thì báo lỗi dễ hiểu
+      if (typeof data === 'string' && data.trim().startsWith('<')) {
+        throw new Error('Unexpected HTML response from API (check REACT_APP_API or backend).');
+      }
+
       // Handle cả trường hợp data là array hoặc object
       const usersList = Array.isArray(data) ? data : (data?.data || []);
       console.log("Users list sau xử lý:", usersList);
