@@ -1,101 +1,34 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Header from './components/Header';
+import Footer from './components/Footer';
+import Dashboard from './pages/Dashboard';
 
-const envApi = process.env.REACT_APP_API;
-const hasEnvApi = typeof envApi === 'string' && envApi.trim() !== '';
-const API = hasEnvApi ? envApi : (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '' : '');
+function Rooms() { return <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}><h2>Phòng</h2><p>Quản lý phòng ở đây.</p></div>; }
+function Tenants() { return <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}><h2>Người Thuê</h2></div>; }
+function Payments() { return <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}><h2>Thanh Toán</h2></div>; }
+function Reports() { return <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}><h2>Báo Cáo</h2></div>; }
+function Settings() { return <div style={{ padding: 24, maxWidth: 800, margin: '0 auto' }}><h2>Cài Đặt</h2></div>; }
 
 export default function App() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => { fetchUsers(); }, []);
-
-  // ── USERS ──────────────────────────────────────────
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      // Build request URL:
-      // - If REACT_APP_API is set, call that backend directly
-      // - If running on localhost (dev), call CRA proxy `/users`
-      // - Otherwise (production w/o REACT_APP_API) call our serverless proxy `/api/users`
-      let url;
-      if (API) url = `${API}/users`;
-      else if (typeof window !== 'undefined' && window.location.hostname === 'localhost') url = '/users';
-      else url = '/api/users';
-      const res = await axios.get(url);
-      console.log("Response URL:", url, "status:", res.status, "headers:", res.headers);
-      const data = res.data;
-      console.log("Dữ liệu từ API:", data);
-
-      // Nếu server trả về HTML (ví dụ index.html) thì báo lỗi dễ hiểu
-      if (typeof data === 'string' && data.trim().startsWith('<')) {
-        console.error('Received HTML from API; likely wrong API URL or proxy.');
-        throw new Error('Unexpected HTML response from API (check REACT_APP_API or backend).');
-      }
-
-      // Handle cả trường hợp data là array hoặc object
-      const usersList = Array.isArray(data) ? data : (data?.data || []);
-      console.log("Users list sau xử lý:", usersList);
-      
-      setUsers(usersList);
-    } catch (err) {
-      setError(err.message);
-      console.error("Lỗi tải dữ liệu:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── RENDER ─────────────────────────────────────────
   return (
     <div style={s.app}>
-      {/* HEADER */}
-      <header style={s.header}>
-        <h1 style={s.logo}>👤 User Manager (Read Only)</h1>
-        <span style={s.subtitle}>Testing API Connection</span>
-      </header>
+      <BrowserRouter>
+        <Header />
 
-      <div style={s.container}>
-        {/* ERROR MESSAGE */}
-        {error && (
-          <div style={{ ...s.errorBox }}>
-            ❌ Lỗi: {error}
-          </div>
-        )}
+        <main>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/rooms" element={<Rooms />} />
+            <Route path="/tenants" element={<Tenants />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </main>
 
-        {/* USER LIST */}
-        <div style={s.card}>
-          <h2 style={s.cardTitle}>📋 Danh sách Users</h2>
-
-          {loading ? (
-            <p style={s.center}>⏳ Đang tải dữ liệu...</p>
-          ) : users.length === 0 ? (
-            <p style={s.center}>📭 Chưa có dữ liệu</p>
-          ) : (
-            <table style={s.table}>
-              <thead>
-                <tr>
-                  <th style={s.th}>ID</th>
-                  <th style={s.th}>Tên</th>
-                  <th style={s.th}>SĐT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.id} style={s.tr}>
-                    <td style={s.td}>{u.id}</td>
-                    <td style={s.td}>{u.name}</td>
-                    <td style={s.td}>{u.phone || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+        <Footer />
+      </BrowserRouter>
     </div>
   );
 }
