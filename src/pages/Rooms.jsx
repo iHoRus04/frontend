@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 export default function Rooms() {
@@ -11,20 +11,24 @@ export default function Rooms() {
   const [createData, setCreateData] = useState({ room_number: '', price: '', status: 'available' });
   const [createLoading, setCreateLoading] = useState(false);
 
-  async function fetchRooms() {
+  const mountedRef = useRef(true);
+
+  const fetchRooms = useCallback(async () => {
     setError(null);
     try {
+      if (!mountedRef.current) return;
       setLoading(true);
       const res = await axios.get('/rooms');
       const data = res.data?.data || [];
+      if (!mountedRef.current) return;
       setRooms(data);
     } catch (err) {
       console.error('fetchRooms error', err.response || err);
-      setError(formatApiError(err) || 'Lỗi khi tải phòng');
+      if (mountedRef.current) setError(formatApiError(err) || 'Lỗi khi tải phòng');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
-  }
+  }, []);
 
   function formatApiError(err) {
     if (!err) return null;
@@ -39,10 +43,10 @@ export default function Rooms() {
   } 
 
   useEffect(() => {
-    let mounted = true;
-    if (mounted) fetchRooms();
-    return () => { mounted = false; };
-  }, []);
+    mountedRef.current = true;
+    fetchRooms();
+    return () => { mountedRef.current = false; };
+  }, [fetchRooms]);
 
   // show alert when error occurs, then clear it
   useEffect(() => {

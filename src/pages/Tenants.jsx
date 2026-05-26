@@ -75,7 +75,6 @@ export default function Tenants() {
   }
 
   if (loading) return <div style={{ padding: 24 }}>⏳ Đang tải người thuê...</div>
-  if (error) return <div style={{ padding: 24, color: 'crimson' }}>❌ {error}</div>
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
