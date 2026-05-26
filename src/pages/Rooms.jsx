@@ -30,19 +30,27 @@ export default function Rooms() {
     if (!err) return null;
     const res = err.response?.data;
     if (!res) return err.message;
-    // Laravel-style validation errors: { errors: { field: [msg, ...] } }
+
     if (res.errors && typeof res.errors === 'object') {
       const msgs = Object.values(res.errors).flat();
       return msgs.join('; ');
     }
     return res.message || JSON.stringify(res);
-  }
+  } 
 
   useEffect(() => {
     let mounted = true;
     if (mounted) fetchRooms();
     return () => { mounted = false; };
   }, []);
+
+  // show alert when error occurs, then clear it
+  useEffect(() => {
+    if (error) {
+      window.alert(error);
+      setError(null);
+    }
+  }, [error]);
 
   const startEdit = (r) => {
     setEditId(r.id);
@@ -119,7 +127,6 @@ export default function Rooms() {
   };
 
   if (loading) return <div style={{ padding: 24 }}>⏳ Đang tải phòng...</div>;
-  if (error) return <div style={{ padding: 24, color: 'crimson' }}>❌ {error}</div>;
 
   return (
     <div style={{ padding: 24, maxWidth: 1000, margin: '0 auto' }}>

@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import './Header.css';
 
 export default function Header() {
 	const [open, setOpen] = useState(false);
+	const [logged, setLogged] = useState(false);
+	const navigate = useNavigate();
+
+	useEffect(() => {
+		try { setLogged(!!localStorage.getItem('authToken')); } catch (e) { setLogged(false); }
+	}, []);
 
 	return (
 		<header className="site-header">
@@ -23,12 +29,16 @@ export default function Header() {
 				</button>
 
 				<nav className={"main-nav " + (open ? 'open' : '')}>
-					<NavLink to="/" end> Bảng Điều Khiển </NavLink>
 					<NavLink to="/rooms"> Phòng </NavLink>
 					<NavLink to="/tenants"> Người Thuê </NavLink>
 					<NavLink to="/contracts"> Hợp Đồng </NavLink>
 					<NavLink to="/invoices"> Hóa Đơn </NavLink>
 					<NavLink to="/utilities"> Tiện Ích </NavLink>
+					{logged && (
+						<button  onClick={() => { localStorage.removeItem('authToken'); setLogged(false); navigate('/login'); }}>
+							Logout
+						</button>
+					)}
 				</nav>
 			</div>
 		</header>

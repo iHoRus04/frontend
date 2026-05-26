@@ -62,6 +62,18 @@
   opacity: 0.85;
 }
 
+.logout-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.logout-btn:hover { opacity: 0.95; }
+
 /* Responsive: collapse nav into toggle for small screens */
 @media (max-width: 720px) {
   .menu-toggle { display: block; }
