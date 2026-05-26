@@ -7,32 +7,34 @@ const WATER_PRICE = 15000;
 export default function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [contracts, setContracts] = useState([]);
+  const [utilities, setUtilities] = useState([]);  // Thêm state utilities
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState(null);
   const [formData, setFormData] = useState({
     contract_id: '',
-    electric_old: '',
-    electric_new: '',
-    water_old: '',
-    water_new: '',
+    utility_id: '',        // Thay vì nhập chỉ số, chọn utility_id
     status: 'unpaid'
   });
+  const [selectedUtility, setSelectedUtility] = useState(null); // Lưu utility được chọn
   const [calculatedTotal, setCalculatedTotal] = useState(0);
-
+  
+  // Lấy dữ liệu ban đầu
   useEffect(() => {
     let mounted = true;
     async function fetchData() {
       try {
         setLoading(true);
-        const [invoicesRes, contractsRes] = await Promise.all([
+        const [invoicesRes, contractsRes, utilitiesRes] = await Promise.all([
           axios.get('/invoices'),
-          axios.get('/contracts')
+          axios.get('/contracts'),
+          axios.get('/utilities')  // Thêm API lấy utilities
         ]);
         if (!mounted) return;
         setInvoices(invoicesRes.data?.data || []);
         setContracts(contractsRes.data?.data || []);
+        setUtilities(utilitiesRes.data?.data || []);
       } catch (err) {
         if (!mounted) return;
         setError(err.message || 'Lỗi tải dữ liệu');
@@ -44,51 +46,61 @@ export default function Invoices() {
     return () => { mounted = false; };
   }, []);
 
+  // Tự động tính tổng tiền khi chọn utility
   useEffect(() => {
-    if (!formData.contract_id) {
+    if (!formData.utility_id) {
       setCalculatedTotal(0);
+      setSelectedUtility(null);
       return;
     }
+    const utility = utilities.find(u => u.id === Number(formData.utility_id));
+    if (!utility) {
+      setCalculatedTotal(0);
+      setSelectedUtility(null);
+      return;
+    }
+    setSelectedUtility(utility);
+    
+    // Tìm contract để lấy room_price
     const contract = contracts.find(c => c.id === Number(formData.contract_id));
-    if (!contract) {
-      setCalculatedTotal(0);
-      return;
-    }
-    const roomPrice = Number(contract.room_price) || 0;
-    const electricOld = Number(formData.electric_old) || 0;
-    const electricNew = Number(formData.electric_new) || 0;
-    const waterOld = Number(formData.water_old) || 0;
-    const waterNew = Number(formData.water_new) || 0;
-    const electricUsed = Math.max(0, electricNew - electricOld);
-    const waterUsed = Math.max(0, waterNew - waterOld);
-    const total = roomPrice + (electricUsed * ELECTRIC_PRICE) + (waterUsed * WATER_PRICE);
+    const roomPrice = Number(contract?.room_price) || 0;
+    
+    // Tính điện, nước tiêu thụ từ utility
+    const electricUsed = Math.max(0, utility.electric_new - utility.electric_old);
+    const waterUsed = Math.max(0, utility.water_new - utility.water_old);
+    const electricCost = electricUsed * ELECTRIC_PRICE;
+    const waterCost = waterUsed * WATER_PRICE;
+    const total = roomPrice + electricCost + waterCost;
     setCalculatedTotal(total);
-  }, [formData, contracts]);
+  }, [formData.utility_id, formData.contract_id, utilities, contracts]);
+
+  const formatMoney = (amount) => {
+    if (!amount) return '0₫';
+    return Number(amount).toLocaleString('vi-VN') + '₫';
+  };
 
   const openCreateForm = () => {
     setEditingInvoice(null);
     setFormData({
       contract_id: '',
-      electric_old: '',
-      electric_new: '',
-      water_old: '',
-      water_new: '',
+      utility_id: '',
       status: 'unpaid'
     });
+    setSelectedUtility(null);
+    setCalculatedTotal(0);
     setShowForm(true);
   };
 
   const openEditForm = (invoice) => {
-    const utility = invoice.utility || {};
     setEditingInvoice(invoice);
     setFormData({
-      contract_id: String(invoice.contract_id),
-      electric_old: utility.electric_old ?? '',
-      electric_new: utility.electric_new ?? '',
-      water_old: utility.water_old ?? '',
-      water_new: utility.water_new ?? '',
+      contract_id: invoice.contract_id,
+      utility_id: invoice.utility_id || '',
       status: invoice.status,
     });
+    // Tìm utility tương ứng để hiển thị
+    const utility = utilities.find(u => u.id === invoice.utility_id);
+    setSelectedUtility(utility || null);
     setShowForm(true);
   };
 
@@ -98,6 +110,7 @@ export default function Invoices() {
       await axios.delete(`/invoices/${id}`);
       const res = await axios.get('/invoices');
       setInvoices(res.data?.data || []);
+      alert('Xóa thành công!');
     } catch (err) {
       alert('Xóa thất bại: ' + (err.response?.data?.message || err.message));
     }
@@ -106,31 +119,33 @@ export default function Invoices() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Tìm utility và contract để lấy dữ liệu
+      const utility = utilities.find(u => u.id === Number(formData.utility_id));
+      if (!utility) throw new Error('Không tìm thấy tiện ích');
+      
       const contract = contracts.find(c => c.id === Number(formData.contract_id));
       if (!contract) throw new Error('Không tìm thấy hợp đồng');
-      const roomPrice = Number(contract.room_price);
-      const electricOld = Number(formData.electric_old);
-      const electricNew = Number(formData.electric_new);
-      const waterOld = Number(formData.water_old);
-      const waterNew = Number(formData.water_new);
-      const electricTotal = Math.max(0, electricNew - electricOld);
-      const waterTotal = Math.max(0, waterNew - waterOld);
+      
+      const roomPrice = Number(contract.deposit_amount) || 0; // Lấy giá phòng từ hợp đồng
+      const electricTotal = Math.max(0, utility.electric_new - utility.electric_old);
+      const waterTotal = Math.max(0, utility.water_new - utility.water_old);
+      
       const payload = {
-        contract_id: formData.contract_id,
-        electric_old: electricOld,
-        electric_new: electricNew,
-        water_old: waterOld,
-        water_new: waterNew,
-        status: formData.status,
+        contract_id: Number(formData.contract_id),
+        utility_id: Number(formData.utility_id),
         room_price: roomPrice,
         electric_total: electricTotal,
         water_total: waterTotal,
         total_amount: calculatedTotal,
+        status: formData.status
       };
+      
       if (editingInvoice) {
         await axios.put(`/invoices/${editingInvoice.id}`, payload);
+        alert('Cập nhật thành công!');
       } else {
         await axios.post('/invoices', payload);
+        alert('Thêm mới thành công!');
       }
       setShowForm(false);
       const res = await axios.get('/invoices');
@@ -155,6 +170,7 @@ export default function Invoices() {
           + Thêm hóa đơn
         </button>
       </div>
+      
       <div style={{ marginTop: 12 }}>
         {invoices.length === 0 ? (
           <div>Không có hóa đơn</div>
@@ -177,11 +193,20 @@ export default function Invoices() {
                 <tr key={i.id} style={{ borderBottom: '1px solid #f4f4f4' }}>
                   <td style={{ padding: 8 }}>{i.id}</td>
                   <td style={{ padding: 8 }}>{i.contract?.id ?? i.contract_id}</td>
-                  <td style={{ padding: 8 }}>{i.room_price} VND</td>
+                  <td style={{ padding: 8 }}>{formatMoney(i.room_price)}</td>
                   <td style={{ padding: 8 }}>{i.electric_total} kWh</td>
                   <td style={{ padding: 8 }}>{i.water_total} m³</td>
-                  <td style={{ padding: 8 }}>{i.total_amount} VND</td>
-                  <td style={{ padding: 8 }}>{i.status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}</td>
+                  <td style={{ padding: 8 }}>{formatMoney(i.total_amount)}</td>
+                  <td style={{ padding: 8 }}>
+                    <span style={{
+                      padding: '4px 8px',
+                      borderRadius: 20,
+                      background: i.status === 'paid' ? '#d4edda' : '#f8d7da',
+                      color: i.status === 'paid' ? '#155724' : '#721c24'
+                    }}>
+                      {i.status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                    </span>
+                  </td>
                   <td style={{ padding: 8 }}>
                     <button onClick={() => openEditForm(i)} style={{ marginRight: 8, background: '#ffc107', border: 'none', padding: '4px 8px', borderRadius: 4 }}>Sửa</button>
                     <button onClick={() => handleDelete(i.id)} style={{ background: '#dc3545', border: 'none', padding: '4px 8px', borderRadius: 4, color: 'white' }}>Xóa</button>
@@ -192,6 +217,8 @@ export default function Invoices() {
           </table>
         )}
       </div>
+      
+      {/* Modal Form Thêm/Sửa Hóa Đơn */}
       {showForm && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -200,25 +227,66 @@ export default function Invoices() {
           <div style={{ background: 'white', padding: 24, borderRadius: 8, width: 500, maxWidth: '90%' }}>
             <h3>{editingInvoice ? 'Sửa hóa đơn' : 'Thêm hóa đơn mới'}</h3>
             <form onSubmit={handleSubmit}>
+              {/* Chọn hợp đồng */}
               <div style={{ marginBottom: 12 }}>
                 <label>Chọn hợp đồng *</label>
                 <select name="contract_id" value={formData.contract_id} onChange={handleInputChange} required style={{ width: '100%', padding: 8 }}>
-                  <option value="">-- Chọn --</option>
+                  <option value="">-- Chọn hợp đồng --</option>
                   {contracts.map(ct => (
                     <option key={ct.id} value={ct.id}>
-                      HĐ {ct.id} - Phòng {ct.room_id} - {Number(ct.room_price).toLocaleString()}đ
+                      HĐ {ct.id} - Phòng {ct.room_id} - {formatMoney(ct.deposit_amount)}/tháng
                     </option>
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                <div style={{ flex: 1 }}><label>Điện cũ (kWh)</label><input type="number" name="electric_old" value={formData.electric_old} onChange={handleInputChange} style={{ width: '100%', padding: 8 }} /></div>
-                <div style={{ flex: 1 }}><label>Điện mới (kWh)</label><input type="number" name="electric_new" value={formData.electric_new} onChange={handleInputChange} style={{ width: '100%', padding: 8 }} /></div>
+              {/* Hiển thị tiền phòng */}
+<div style={{ marginBottom: 12 }}>
+  <label>Tiền phòng (VNĐ)</label>
+  <input 
+    type="text" 
+    name="room_price" 
+    // Tìm trực tiếp từ danh sách hợp đồng dựa vào ID đang chọn
+    value={formatMoney(Number(contracts.find(c => Number(c.id) === Number(formData.contract_id))?.deposit_amount || 0))} 
+    readOnly 
+    style={{ 
+      width: '100%', 
+      padding: 8, 
+      backgroundColor: '#f8f9fa', 
+      border: '1px solid #ced4da',
+      borderRadius: 4 
+    }} 
+  />
+</div>
+              {/* Chọn tiện ích (chỉ số điện/nước) */}
+              <div style={{ marginBottom: 12 }}>
+                <label>Chọn chỉ số điện/nước *</label>
+                <select name="utility_id" value={formData.utility_id} onChange={handleInputChange} required style={{ width: '100%', padding: 8 }}>
+                  <option value="">-- Chọn chỉ số --</option>
+                  {utilities.map(u => (
+                    <option key={u.id} value={u.id}>
+                      Tháng {u.month} - Điện: {u.electric_old} → {u.electric_new} kWh (dùng {Math.max(0, u.electric_new - u.electric_old)} kWh) | 
+                      Nước: {u.water_old} → {u.water_new} m³ (dùng {Math.max(0, u.water_new - u.water_old)} m³)
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-                <div style={{ flex: 1 }}><label>Nước cũ (m³)</label><input type="number" name="water_old" value={formData.water_old} onChange={handleInputChange} style={{ width: '100%', padding: 8 }} /></div>
-                <div style={{ flex: 1 }}><label>Nước mới (m³)</label><input type="number" name="water_new" value={formData.water_new} onChange={handleInputChange} style={{ width: '100%', padding: 8 }} /></div>
-              </div>
+
+              {/* Hiển thị tổng hợp chỉ số đã chọn */}
+              {selectedUtility && (
+                <div style={{ marginBottom: 12, padding: 12, background: '#e9ecef', borderRadius: 4 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 8 }}>📊 Thông tin chỉ số đã chọn:</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span>⚡ Điện:</span>
+                    <span>{selectedUtility.electric_old} kWh → {selectedUtility.electric_new} kWh (dùng {Math.max(0, selectedUtility.electric_new - selectedUtility.electric_old)} kWh)</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>💧 Nước:</span>
+                    <span>{selectedUtility.water_old} m³ → {selectedUtility.water_new} m³ (dùng {Math.max(0, selectedUtility.water_new - selectedUtility.water_old)} m³)</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Trạng thái */}
               <div style={{ marginBottom: 12 }}>
                 <label>Trạng thái</label>
                 <select name="status" value={formData.status} onChange={handleInputChange} style={{ width: '100%', padding: 8 }}>
@@ -226,10 +294,21 @@ export default function Invoices() {
                   <option value="paid">Đã thanh toán</option>
                 </select>
               </div>
-              <div style={{ marginBottom: 20, padding: 10, background: '#f0f0f0', borderRadius: 4 }}>
-                <strong>Tổng tiền tự động: {calculatedTotal.toLocaleString()} VND</strong>
-                <div style={{ fontSize: 12, color: '#666' }}>(Điện: {(formData.electric_new - formData.electric_old) || 0} kWh × {ELECTRIC_PRICE}đ + Nước: {(formData.water_new - formData.water_old) || 0} m³ × {WATER_PRICE}đ)</div>
+
+              {/* Hiển thị tổng tiền tự động */}
+              <div style={{ marginBottom: 20, padding: 15, background: '#28a745', color: 'white', borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 14, opacity: 0.9 }}>💰 TỔNG TIỀN HÓA ĐƠN</div>
+                <div style={{ fontSize: 24, fontWeight: 'bold' }}>{formatMoney(calculatedTotal)}</div>
+                {selectedUtility && (
+                  <div style={{ fontSize: 11, marginTop: 8, opacity: 0.8 }}>
+                    = {formatMoney(Number(contracts.find(c => c.id === Number(formData.contract_id))?.deposit_amount || 0))} 
+                    + (⚡ {Math.max(0, selectedUtility.electric_new - selectedUtility.electric_old)} kWh × {ELECTRIC_PRICE}đ) 
+                    + (💧 {Math.max(0, selectedUtility.water_new - selectedUtility.water_old)} m³ × {WATER_PRICE}đ)
+                  </div>
+                )}
               </div>
+
+              {/* Nút hành động */}
               <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                 <button type="button" onClick={() => setShowForm(false)} style={{ padding: '8px 16px', background: '#6c757d', color: 'white', border: 'none', borderRadius: 4 }}>Hủy</button>
                 <button type="submit" style={{ padding: '8px 16px', background: '#28a745', color: 'white', border: 'none', borderRadius: 4 }}>Lưu</button>
